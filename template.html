@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>点名系统</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --ink: #1a1d21;
+    --muted: #8a8f98;
+    --line: #e6e8ec;
+    --brand: #2563eb;
+    --brand-ink: #ffffff;
+    --green: #16a34a;
+    --orange: #ea8a00;
+    --red: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111418; --card:#1b1f24; --ink:#e8eaed; --muted:#9aa0a8; --line:#2a2f36; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans",
+      "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--line);
+  }
+  header .brand { font-size: 17px; font-weight: 700; flex: 1; }
+  header select {
+    font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink);
+  }
+  nav.tabs {
+    display: flex; gap: 6px; padding: 10px 16px 0; background: var(--bg);
+    position: sticky; top: 49px; z-index: 9;
+  }
+  nav.tabs button {
+    flex: 1; padding: 9px 0; font-size: 14px; border: none; border-radius: 10px 10px 0 0;
+    background: transparent; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+  }
+  nav.tabs button.active { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; margin-bottom: 14px;
+  }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row b { flex: 1; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .hint { color: var(--orange); font-size: 12px; margin: 2px 0 4px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 16px; font-size: 15px; border: none; border-radius: 10px; cursor: pointer;
+    background: var(--brand); color: var(--brand-ink); font-weight: 600;
+  }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.ghost { background: transparent; color: var(--brand); border: 1px solid var(--line); }
+  .btn.danger { background: transparent; color: var(--red); border: 1px solid var(--line); }
+  .btn.small { padding: 4px 10px; font-size: 13px; border-radius: 8px; }
+  .btn.block { width: 100%; }
+  .actions { display: flex; gap: 8px; margin-top: 8px; }
+  .actions .btn { flex: 1; }
+  .divider { height: 1px; background: var(--line); margin: 12px 0; }
+  .section-title { font-size: 15px; font-weight: 700; margin: 18px 0 8px; }
+  .chip {
+    display: inline-block; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 999px; padding: 2px 10px; font-size: 13px; margin: 2px 4px 2px 0;
+  }
+  .badge {
+    display: inline-block; color: #fff; font-size: 11px; border-radius: 999px;
+    padding: 1px 8px; margin-left: 6px; white-space: nowrap;
+  }
+  .badge.done { background: var(--green); }
+  .badge.absent { background: var(--orange); }
+  .student { padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  .student:last-child { border-bottom: none; }
+  .sid { color: var(--muted); font-size: 13px; min-width: 36px; }
+  .sname { flex: 1; }
+  .sname.strike { text-decoration: line-through; color: var(--muted); }
+  .icon-btn { border: none; background: transparent; cursor: pointer; font-size: 15px; color: var(--muted); padding: 2px 6px; }
+  .icon-btn:hover { color: var(--ink); }
+  .list-item { padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .list-item:last-child { border-bottom: none; }
+  .setting-row { display: flex; align-items: center; gap: 10px; padding: 12px 2px; cursor: pointer; border-bottom: 1px solid var(--line); }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-row .lbl { flex: 1; }
+  .setting-row .val { color: var(--muted); font-size: 14px; }
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: #1a1d21; color: #fff; padding: 10px 16px; border-radius: 10px;
+    font-size: 14px; max-width: 90vw; box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 99;
+  }
+  .empty { text-align: center; color: var(--muted); padding: 40px 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand" id="appTitle">点名系统</div>
+  <select id="langSel" aria-label="language"></select>
+</header>
+<nav class="tabs">
+  <button class="tab active" data-tab="draw" id="tabbtn-draw"></button>
+  <button class="tab" data-tab="history" id="tabbtn-history"></button>
+  <button class="tab" data-tab="settings" id="tabbtn-settings"></button>
+</nav>
+<main>
+  <div id="panel-draw"></div>
+  <div id="panel-history" hidden></div>
+  <div id="panel-settings" hidden></div>
+</main>
+<div id="toast" hidden></div>
+
+<script>
+'use strict';
+
+/* ================================================================
+   初始数据（由 Skill 生成时把下面的 SEED_DATA 占位符替换为实际 JSON）
+   结构：{ "language": "zh", "perDraw": 3,
+           "classes": [ { "name": "VB", "students": [ { "name": "ウィン", "id": "1" }, ... ] } ] }
+   language 取值：zh / zh_Hant / ja / en / ko / fr，空字符串 = 跟随系统
+   ================================================================ */
+const SEED_DATA = __SEED_DATA__;
+
+/* ---------------- 多语言 ----------------
+   占位符：{n} {cls} {done} {total} {date}
+------------------------------------------ */
+const I18N = {
+  zh: {
+    appTitle:"值日生抽选", draw:"开始抽选", undo:"撤销上次", reset:"重置本轮",
+    home:"抽选", history:"抽选纪录", settings:"设置", done:"已值日", absent:"请假",
+    cancelAbsent:"取消请假", makeupShort:"补", drawCount:"已进行 {n} 次抽选",
+    drawResult:"本次抽选结果", notYet:"尚未抽选", classProgress:"已值日 {done}/{total}",
+    absentCountMsg:"请假 {n} 人（下次强制出现）", toastDrawn:"第 {n} 次抽选",
+    rolloverCarried:"{cls} 本轮结束，剩余 {n} 人滚入本次补足", newCycle:"{cls} 本轮结束，开启新一轮",
+    makeupCount:"含 {n} 名请假补做", noUndo:"没有可撤销的操作", undoDone:"已撤销上次抽选",
+    resetConfirm:"确定清除所有「已值日」和「请假」标记吗？", resetDone:"已清除所有标记",
+    exportBackup:"导出备份", exportOk:"备份已导出（已复制到剪贴板）", importBackup:"导入备份",
+    importOk:"备份已导入", importFail:"导入失败：文件格式不正确", language:"语言", selectLanguage:"选择语言",
+    perDrawLabel:"每组每次抽选人数", manageClasses:"班级与学生管理", className:"班级名",
+    studentName:"学生姓名", studentId:"学生学号", addClass:"添加班级", addStudent:"添加学生",
+    deleteClassConfirm:"确定删除该班级及其所有学生吗？", clearAllData:"清空所有数据",
+    clearAllConfirm:"确定清空所有数据吗？此操作不可恢复。", clearAllDone:"已清空所有数据",
+    enterName:"请输入姓名", enterStudentNo:"请输入学号（可留空）", enterClassName:"请输入班级名",
+    emptyName:"姓名不能为空", emptyClassName:"班级名不能为空", resultInfo:"第 {n} 次 · {date}", noData:"暂无数据", noClassHint:"还没有班级，请先到「设置 → 班级与学生管理」添加班级和学生"
+  },
+  zh_Hant: {
+    appTitle:"值日生抽選", draw:"開始抽選", undo:"撤銷上次", reset:"重設本輪",
+    home:"抽選", history:"抽選紀錄", settings:"設定", done:"已值日", absent:"請假",
+    cancelAbsent:"取消請假", makeupShort:"補", drawCount:"已進行 {n} 次抽選",
+    drawResult:"本次抽選結果", notYet:"尚未抽選", classProgress:"已值日 {done}/{total}",
+    absentCountMsg:"請假 {n} 人（下次強制出現）", toastDrawn:"第 {n} 次抽選",
+    rolloverCarried:"{cls} 本輪結束，剩餘 {n} 人滾入本次補足", newCycle:"{cls} 本輪結束，開啟新一輪",
+    makeupCount:"含 {n} 名請假補做", noUndo:"沒有可撤銷的操作", undoDone:"已撤銷上次抽選",
+    resetConfirm:"確定清除所有「已值日」和「請假」標記嗎？", resetDone:"已清除所有標記",
+    exportBackup:"匯出備份", exportOk:"備份已匯出（已複製到剪貼簿）", importBackup:"匯入備份",
+    importOk:"備份已匯入", importFail:"匯入失敗：檔案格式不正確", language:"語言", selectLanguage:"選擇語言",
+    perDrawLabel:"每組每次抽選人數", manageClasses:"班級與學生管理", className:"班級名",
+    studentName:"學生姓名", studentId:"學生學號", addClass:"新增班級", addStudent:"新增學生",
+    deleteClassConfirm:"確定刪除該班級及其所有學生嗎？", clearAllData:"清空所有資料",
+    clearAllConfirm:"確定清空所有資料嗎？此操作無法復原。", clearAllDone:"已清空所有資料",
+    enterName:"請輸入姓名", enterStudentNo:"請輸入學號（可留空）", enterClassName:"請輸入班級名",
+    emptyName:"姓名不能為空", emptyClassName:"班級名不能為空", resultInfo:"第 {n} 次 · {date}", noData:"暫無資料", noClassHint:"還沒有班級，請先到「設定 → 班級與學生管理」新增班級和學生"
+  },
+  ja: {
+    appTitle:"当番抽選", draw:"抽選する", undo:"前回を戻す", reset:"今週をリセット",
+    home:"抽選", history:"履歴", settings:"設定", done:"当番済み", absent:"欠席",
+    cancelAbsent:"欠席取消", makeupShort:"振替", drawCount:"抽選 {n} 回実施済み",
+    drawResult:"今回の抽選結果", notYet:"まだ抽選していません", classProgress:"当番済み {done}/{total}",
+    absentCountMsg:"欠席 {n} 人（次回必ず登場）", toastDrawn:"第 {n} 回抽選",
+    rolloverCarried:"{cls} の周が終了、残り {n} 人を今回に繰り越して補充", newCycle:"{cls} の周が終了、新しい周を開始",
+    makeupCount:"振替 {n} 人を含む", noUndo:"取り消せる操作がありません", undoDone:"前回の抽選を取り消しました",
+    resetConfirm:"「当番済み」と「欠席」のマークをすべて消去しますか？", resetDone:"マークをすべて消去しました",
+    exportBackup:"バックアップ書き出し", exportOk:"バックアップを書き出しました（クリップボードにコピー）", importBackup:"バックアップ読み込み",
+    importOk:"バックアップを読み込みました", importFail:"読み込み失敗：ファイル形式が正しくありません", language:"言語", selectLanguage:"言語を選択",
+    perDrawLabel:"1組あたりの抽選人数", manageClasses:"クラスと生徒の管理", className:"クラス名",
+    studentName:"生徒名", studentId:"学籍番号", addClass:"クラス追加", addStudent:"生徒追加",
+    deleteClassConfirm:"このクラスと全生徒を削除しますか？", clearAllData:"全データ消去",
+    clearAllConfirm:"全データを消去しますか？この操作は元に戻せません。", clearAllDone:"全データを消去しました",
+    enterName:"氏名を入力", enterStudentNo:"学籍番号を入力（空欄可）", enterClassName:"クラス名を入力",
+    emptyName:"氏名を入力してください", emptyClassName:"クラス名を入力してください", resultInfo:"第 {n} 回 · {date}", noData:"まだデータがありません", noClassHint:"まだクラスがありません。「設定 → クラスと生徒の管理」で追加してください"
+  },
+  en: {
+    appTitle:"Duty Roster", draw:"Start draw", undo:"Undo last", reset:"Reset round",
+    home:"Draw", history:"History", settings:"Settings", done:"Done", absent:"Absent",
+    cancelAbsent:"Cancel leave", makeupShort:"Makeup", drawCount:"Completed {n} draws",
+    drawResult:"This draw's result", notYet:"Not drawn yet", classProgress:"Done {done}/{total}",
+    absentCountMsg:"{n} absent (will appear next draw)", toastDrawn:"Draw #{n}",
+    rolloverCarried:"{cls} round ended, {n} remaining carried over and topped up", newCycle:"{cls} round ended, new round started",
+    makeupCount:"includes {n} makeup", noUndo:"Nothing to undo", undoDone:"Last draw undone",
+    resetConfirm:"Clear all 'Done' and 'Absent' marks?", resetDone:"All marks cleared",
+    exportBackup:"Export backup", exportOk:"Backup exported (copied to clipboard)", importBackup:"Import backup",
+    importOk:"Backup imported", importFail:"Import failed: invalid file", language:"Language", selectLanguage:"Select language",
+    perDrawLabel:"Students per draw (each class)", manageClasses:"Manage classes & students", className:"Class name",
+    studentName:"Student name", studentId:"Student ID", addClass:"Add class", addStudent:"Add student",
+    deleteClassConfirm:"Delete this class and all its students?", clearAllData:"Clear all data",
+    clearAllConfirm:"Clear all data? This cannot be undone.", clearAllDone:"All data cleared",
+    enterName:"Enter name", enterStudentNo:"Enter student ID (optional)", enterClassName:"Enter class name",
+    emptyName:"Name cannot be empty", emptyClassName:"Class name cannot be empty", resultInfo:"Draw #{n} · {date}", noData:"No data yet", noClassHint:"No classes yet. Add classes and students in Settings → Manage classes & students."
+  },
+  ko: {
+    appTitle:"당번 추첨", draw:"추첨하기", undo:"이전 실행 취소", reset:"이번 라운드 초기화",
+    home:"추첨", history:"기록", settings:"설정", done:"당번 완료", absent:"결석",
+    cancelAbsent:"결석 취소", makeupShort:"보충", drawCount:"추첨 {n}회 완료",
+    drawResult:"이번 추첨 결과", notYet:"아직 추첨 전", classProgress:"완료 {done}/{total}",
+    absentCountMsg:"결석 {n}명 (다음 추첨에 반드시 포함)", toastDrawn:"{n}회차 추첨",
+    rolloverCarried:"{cls} 라운드 종료, 남은 {n}명을 이번에 이월·보충", newCycle:"{cls} 라운드 종료, 새 라운드 시작",
+    makeupCount:"보충 {n}명 포함", noUndo:"취소할 작업이 없습니다", undoDone:"이전 추첨을 취소했습니다",
+    resetConfirm:"모든 '완료' 및 '결석' 표시를 지울까요?", resetDone:"모든 표시를 지웠습니다",
+    exportBackup:"백업 내보내기", exportOk:"백업을 내보냈습니다 (클립보드에 복사됨)", importBackup:"백업 가져오기",
+    importOk:"백업을 가져왔습니다", importFail:"가져오기 실패: 파일 형식이 올바르지 않습니다", language:"언어", selectLanguage:"언어 선택",
+    perDrawLabel:"반별 추첨 인원", manageClasses:"반 및 학생 관리", className:"반 이름",
+    studentName:"학생 이름", studentId:"학번", addClass:"반 추가", addStudent:"학생 추가",
+    deleteClassConfirm:"이 반과 모든 학생을 삭제할까요?", clearAllData:"모든 데이터 삭제",
+    clearAllConfirm:"모든 데이터를 삭제할까요? 되돌릴 수 없습니다.", clearAllDone:"모든 데이터를 삭제했습니다",
+    enterName:"이름 입력", enterStudentNo:"학번 입력 (선택)", enterClassName:"반 이름 입력",
+    emptyName:"이름을 입력하세요", emptyClassName:"반 이름을 입력하세요", resultInfo:"{n}회차 · {date}", noData:"아직 데이터가 없습니다", noClassHint:"아직 반이 없습니다. '설정 → 반 및 학생 관리'에서 추가하세요."
+  },
+  fr: {
+    appTitle:"Tirage de service", draw:"Tirer", undo:"Annuler le dernier", reset:"Réinitialiser le tour",
+    home:"Tirage", history:"Historique", settings:"Réglages", done:"Fait", absent:"Absent",
+    cancelAbsent:"Annuler l'absence", makeupShort:"Rattrapage", drawCount:"{n} tirages effectués",
+    drawResult:"Résultat de ce tirage", notYet:"Pas encore tiré", classProgress:"Fait {done}/{total}",
+    absentCountMsg:"{n} absent(s) (présents au prochain tirage)", toastDrawn:"Tirage n°{n}",
+    rolloverCarried:"Tour de {cls} terminé, {n} restant(s) reporté(s) et complété(s)", newCycle:"Tour de {cls} terminé, nouveau tour",
+    makeupCount:"dont {n} rattrapage(s)", noUndo:"Rien à annuler", undoDone:"Dernier tirage annulé",
+    resetConfirm:"Effacer toutes les marques « Fait » et « Absent » ?", resetDone:"Toutes les marques effacées",
+    exportBackup:"Exporter la sauvegarde", exportOk:"Sauvegarde exportée (copiée)", importBackup:"Importer la sauvegarde",
+    importOk:"Sauvegarde importée", importFail:"Échec de l'import : fichier invalide", language:"Langue", selectLanguage:"Choisir la langue",
+    perDrawLabel:"Élèves par tirage (par classe)", manageClasses:"Gérer classes et élèves", className:"Nom de la classe",
+    studentName:"Nom de l'élève", studentId:"N° d'élève", addClass:"Ajouter une classe", addStudent:"Ajouter un élève",
+    deleteClassConfirm:"Supprimer cette classe et tous ses élèves ?", clearAllData:"Effacer toutes les données",
+    clearAllConfirm:"Effacer toutes les données ? Irréversible.", clearAllDone:"Toutes les données effacées",
+    enterName:"Saisir le nom", enterStudentNo:"Saisir le n° d'élève (facultatif)", enterClassName:"Saisir le nom de la classe",
+    emptyName:"Le nom est obligatoire", emptyClassName:"Le nom de la classe est obligatoire", resultInfo:"Tirage n°{n} · {date}", noData:"Aucune donnée", noClassHint:"Aucune classe. Ajoutez des classes et des élèves dans Réglages → Gérer classes et élèves."
+  }
+};
+
+const LANG_NAMES = [
+  ["zh", "简体中文"], ["zh_Hant", "繁體中文"], ["ja", "日本語"],
+  ["en", "English"], ["ko", "한국어"], ["fr", "Français"]
+];
+
+/* ---------------- 工具 ---------------- */
+const LS_KEY = 'rollcall-state-v1';
+let state = null;
+let currentTab = 'draw';
+let toastTimer = null;
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function genId() {
+  return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtDate() {
+  const d = new Date();
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+    + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function L() { return I18N[state.language] || I18N.zh; }
+function t(key, params) {
+  let s = (L()[key] != null ? L()[key] : I18N.zh[key]) || key;
+  if (params) s = s.replace(/\{(\w+)\}/g, (m, k) => (params[k] != null ? params[k] : m));
+  return s;
+}
+function detectLang() {
+  const n = (navigator.language || 'zh').toLowerCase();
+  if (n.indexOf('zh') === 0) {
+    if (/(tw|hk|mo|hant)/.test(n)) return 'zh_Hant';
+    return 'zh';
+  }
+  if (n.indexOf('ja') === 0) return 'ja';
+  if (n.indexOf('ko') === 0) return 'ko';
+  if (n.indexOf('fr') === 0) return 'fr';
+  return 'en';
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+}
+
+/* ---------------- 存储与初始化 ---------------- */
+function seedState() {
+  const seed = (typeof SEED_DATA === 'object' && SEED_DATA) ? SEED_DATA : {};
+  const language = seed.language || detectLang();
+  const perDraw = seed.perDraw || 3;
+  const classes = (seed.classes || []).map(c => ({
+    name: c.name || '',
+    students: (c.students || []).map(s => ({
+      id: (s.id != null && s.id !== '') ? String(s.id) : genId(),
+      name: s.name || '',
+      done: false,
+      absent: false
+    }))
+  }));
+  return { language, perDraw, drawCount: 0, classes, history: [], lastDraw: null, undoSnapshot: null };
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) { state = JSON.parse(raw); return; }
+  } catch (e) {}
+  state = seedState();
+  save();
+}
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+/* ---------------- 抽选算法 ---------------- */
+function sample(arr, k) {
+  const a = arr.slice();
+  const n = a.length;
+  const m = Math.min(k, n);
+  for (let i = 0; i < m; i++) {
+    const j = i + Math.floor(Math.random() * (n - i));
+    const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a.slice(0, m);
+}
+function drawGroup(cls, n) {
+  n = Math.max(1, Math.min(n, cls.students.length));
+  const out = { entries: [], rolledOver: false, carried: 0 };
+  // 1) 请假者强制出现
+  for (const s of cls.students) {
+    if (out.entries.length >= n) break;
+    if (s.absent) out.entries.push({ id: s.id, name: s.name, forced: true });
+  }
+  // 2) 从「未值日且未请假」补足
+  let pool = cls.students.filter(s => !s.done && !s.absent);
+  let need = n - out.entries.length;
+  if (pool.length >= need) {
+    for (const s of sample(pool, need)) out.entries.push({ id: s.id, name: s.name, forced: false });
+  } else {
+    // 剩余不足 N：滚入本次并开启新循环
+    out.rolledOver = true;
+    out.carried = pool.length;
+    for (const s of pool) out.entries.push({ id: s.id, name: s.name, forced: false });
+    cls.students.forEach(s => { s.done = false; });
+    need = n - out.entries.length;
+    const pickedIds = out.entries.map(e => e.id);
+    const fresh = cls.students.filter(s => !s.absent && pickedIds.indexOf(s.id) < 0);
+    for (const s of sample(fresh, need)) out.entries.push({ id: s.id, name: s.name, forced: false });
+  }
+  // 标记完成
+  const ids = out.entries.map(e => e.id);
+  cls.students.forEach(s => {
+    if (ids.indexOf(s.id) >= 0) { s.done = true; s.absent = false; }
+  });
+  return out;
+}
+
+/* ---------------- 动作 ---------------- */
+function doDraw() {
+  if (!state.classes.length) { toast(t('noClassHint')); return; }
+  state.undoSnapshot = JSON.parse(JSON.stringify({
+    drawCount: state.drawCount, classes: state.classes, history: state.history, lastDraw: state.lastDraw
+  }));
+  const results = state.classes.map(c => drawGroup(c, state.perDraw));
+  state.drawCount++;
+  const rec = {
+    no: state.drawCount, ts: fmtDate(),
+    results: results.map((r, i) => ({ cls: state.classes[i].name, entries: r.entries }))
+  };
+  state.history.push(rec);
+  state.lastDraw = rec;
+  save(); render();
+  const notes = [];
+  let makeup = 0;
+  results.forEach((r, i) => {
+    makeup += r.entries.filter(e => e.forced).length;
+    if (r.rolledOver) {
+      notes.push(r.carried > 0 ? t('rolloverCarried', { cls: state.classes[i].name, n: r.carried })
+                                : t('newCycle', { cls: state.classes[i].name }));
+    }
+  });
+  if (makeup) notes.push(t('makeupCount', { n: makeup }));
+  const base = t('toastDrawn', { n: state.drawCount });
+  toast(notes.length ? base + '（' + notes.join('；') + '）' : base);
+}
+function doUndo() {
+  if (!state.undoSnapshot) { toast(t('noUndo')); return; }
+  state.drawCount = state.undoSnapshot.drawCount;
+  state.classes = state.undoSnapshot.classes;
+  state.history = state.undoSnapshot.history;
+  state.lastDraw = state.undoSnapshot.lastDraw;
+  state.undoSnapshot = null;
+  save(); render();
+  toast(t('undoDone'));
+}
+function doReset() {
+  if (!confirm(t('resetConfirm'))) return;
+  state.classes.forEach(c => c.students.forEach(s => { s.done = false; s.absent = false; }));
+  state.undoSnapshot = null;
+  save(); render();
+  toast(t('resetDone'));
+}
+function doToggleAbsent(ci, si) {
+  const s = state.classes[ci].students[si];
+  s.absent = !s.absent;
+  if (s.absent) s.done = false;
+  save(); render();
+}
+
+/* ---------------- 设置动作 ---------------- */
+function doSetPerDraw() {
+  const v = prompt(t('perDrawLabel'), String(state.perDraw));
+  if (v == null) return;
+  const n = parseInt(v, 10);
+  if (!isNaN(n)) { state.perDraw = Math.max(1, Math.min(20, n)); save(); render(); }
+}
+function doAddClass() {
+  const name = (prompt(t('enterClassName')) || '').trim();
+  if (!name) { toast(t('emptyClassName')); return; }
+  state.classes.push({ name, students: [] });
+  save(); render();
+}
+function doRenameClass(ci) {
+  const name = (prompt(t('className'), state.classes[ci].name) || '').trim();
+  if (!name) return;
+  state.classes[ci].name = name;
+  save(); render();
+}
+function doDelClass(ci) {
+  if (!confirm(t('deleteClassConfirm'))) return;
+  state.classes.splice(ci, 1);
+  save(); render();
+}
+function doAddStudent(ci) {
+  const name = (prompt(t('enterName')) || '').trim();
+  if (!name) { toast(t('emptyName')); return; }
+  const id = (prompt(t('enterStudentNo')) || '').trim();
+  state.classes[ci].students.push({ id: id || genId(), name, done: false, absent: false });
+  save(); render();
+}
+function doEditStudent(ci, si) {
+  const s = state.classes[ci].students[si];
+  const name = (prompt(t('studentName'), s.name) || '').trim();
+  if (!name) return;
+  const id = (prompt(t('studentId'), s.id) || '').trim();
+  s.name = name;
+  s.id = id || s.id;
+  save(); render();
+}
+function doDelStudent(ci, si) {
+  state.classes[ci].students.splice(si, 1);
+  save(); render();
+}
+function doExport() {
+  const json = JSON.stringify(state, null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(json).then(() => toast(t('exportOk'))).catch(() => promptCopy(json));
+  } else {
+    promptCopy(json);
+  }
+}
+function promptCopy(json) {
+  prompt(t('exportBackup'), json);
+  toast(t('exportOk'));
+}
+function doImport() {
+  const text = prompt(t('importBackup'));
+  if (text == null) return;
+  try {
+    const d = JSON.parse(text);
+    if (!d || !Array.isArray(d.classes)) throw new Error('bad');
+    state = d;
+    state.undoSnapshot = null;
+    save(); render();
+    toast(t('importOk'));
+  } catch (e) {
+    toast(t('importFail'));
+  }
+}
+function doClearAll() {
+  if (!confirm(t('clearAllConfirm'))) return;
+  const lang = state.language;
+  state = { language: lang, perDraw: 3, drawCount: 0, classes: [], history: [], lastDraw: null, undoSnapshot: null };
+  save(); render();
+  toast(t('clearAllDone'));
+}
+
+/* ---------------- 渲染 ---------------- */
+function badge(cls) {
+  return '<span class="badge ' + cls + '">' + esc(t(cls)) + '</span>';
+}
+function render() {
+  const lang = L();
+  document.title = lang.appTitle;
+  document.getElementById('appTitle').textContent = lang.appTitle;
+  document.getElementById('tabbtn-draw').textContent = lang.home;
+  document.getElementById('tabbtn-history').textContent = lang.history;
+  document.getElementById('tabbtn-settings').textContent = lang.settings;
+  document.getElementById('langSel').value = state.language;
+  renderDraw();
+  renderHistory();
+  renderSettings();
+  document.getElementById('panel-draw').hidden = (currentTab !== 'draw');
+  document.getElementById('panel-history').hidden = (currentTab !== 'history');
+  document.getElementById('panel-settings').hidden = (currentTab !== 'settings');
+  document.querySelectorAll('.tab').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-tab') === currentTab);
+  });
+}
+
+function renderDraw() {
+  const el = document.getElementById('panel-draw');
+  if (!state.classes.length) {
+    el.innerHTML = '<div class="empty">' + esc(t('noClassHint')) + '</div>';
+    return;
+  }
+  let h = '';
+  h += '<div class="card">';
+  h += '<div class="muted" style="margin-bottom:10px">' + esc(t('drawCount', { n: state.drawCount })) + '</div>';
+  h += '<button class="btn block" data-action="draw">🎲 ' + esc(t('draw')) + '</button>';
+  h += '<div class="actions"><button class="btn ghost" data-action="undo" ' + (state.undoSnapshot ? '' : 'disabled') + '>' + esc(t('undo')) + '</button>'
+     + '<button class="btn ghost" data-action="reset">' + esc(t('reset')) + '</button></div>';
+  h += '</div>';
+  h += '<div class="card">';
+  h += '<div class="row"><b>' + esc(t('drawResult')) + '</b>';
+  if (state.lastDraw) h += '<span class="muted">' + esc(t('resultInfo', { n: state.lastDraw.no, date: state.lastDraw.ts })) + '</span>';
+  h += '</div>';
+  if (!state.lastDraw) {
+    h += '<div class="muted" style="margin-top:6px">' + esc(t('notYet')) + '</div>';
+  } else {
+    for (const r of state.lastDraw.results) {
+      h += '<div class="list-item"><span class="muted" style="min-width:72px;display:inline-block">' + esc(r.cls) + '</span>';
+      for (const e of r.entries) {
+        h += '<span class="chip">' + esc(e.name) + (e.forced ? '（' + esc(t('makeupShort')) + '）' : '') + '</span>';
+      }
+      h += '</div>';
+    }
+  }
+  h += '</div>';
+  for (let ci = 0; ci < state.classes.length; ci++) {
+    const c = state.classes[ci];
+    const done = c.students.filter(s => s.done).length;
+    const absent = c.students.filter(s => s.absent).length;
+    h += '<div class="card">';
+    h += '<div class="row"><b>' + esc(c.name) + '</b><span class="muted">' + esc(t('classProgress', { done, total: c.students.length })) + '</span></div>';
+    if (absent) h += '<div class="hint">' + esc(t('absentCountMsg', { n: absent })) + '</div>';
+    for (let si = 0; si < c.students.length; si++) {
+      const s = c.students[si];
+      h += '<div class="row student">';
+      h += '<span class="sid">' + esc(s.id) + '</span>';
+      h += '<span class="sname' + (s.done ? ' strike' : '') + '">' + esc(s.name) + '</span>';
+      if (s.done) h += badge('done'); else if (s.absent) h += badge('absent');
+      h += '<button class="btn ghost small" data-action="toggleAbsent" data-ci="' + ci + '" data-si="' + si + '">' + esc(s.absent ? t('cancelAbsent') : t('absent')) + '</button>';
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  el.innerHTML = h;
+}
+
+function renderHistory() {
+  const el = document.getElementById('panel-history');
+  if (!state.history.length) {
+    el.innerHTML = '<div class="empty">' + esc(t('noData')) + '</div>';
+    return;
+  }
+  let h = '';
+  for (let i = state.history.length - 1; i >= 0; i--) {
+    const rec = state.history[i];
+    h += '<div class="card"><b>' + esc(t('resultInfo', { n: rec.no, date: rec.ts })) + '</b>';
+    for (const r of rec.results) {
+      h += '<div class="list-item"><span class="muted" style="min-width:72px;display:inline-block">' + esc(r.cls) + '</span>'
+         + esc(r.entries.map(e => e.forced ? e.name + '(' + t('makeupShort') + ')' : e.name).join('、')) + '</div>';
+    }
+    h += '</div>';
+  }
+  el.innerHTML = h;
+}
+
+function renderSettings() {
+  const el = document.getElementById('panel-settings');
+  let h = '';
+  h += '<div class="setting-row" data-action="setPerDraw"><span class="lbl">' + esc(t('perDrawLabel')) + '</span><span class="val">' + state.perDraw + ' ›</span></div>';
+  h += '<div class="divider"></div>';
+  h += '<div class="section-title">' + esc(t('manageClasses')) + '</div>';
+  for (let ci = 0; ci < state.classes.length; ci++) {
+    const c = state.classes[ci];
+    h += '<div class="card" style="padding:10px">';
+    h += '<div class="row"><b>' + esc(c.name) + '</b>'
+       + '<button class="icon-btn" data-action="renameClass" data-ci="' + ci + '" title="rename">✎</button>'
+       + '<button class="icon-btn" data-action="delClass" data-ci="' + ci + '" title="delete">✕</button></div>';
+    for (let si = 0; si < c.students.length; si++) {
+      const s = c.students[si];
+      h += '<div class="row student"><span class="sid">' + esc(s.id) + '</span><span class="sname">' + esc(s.name) + '</span>'
+         + '<button class="icon-btn" data-action="editStudent" data-ci="' + ci + '" data-si="' + si + '" title="edit">✎</button>'
+         + '<button class="icon-btn" data-action="delStudent" data-ci="' + ci + '" data-si="' + si + '" title="delete">✕</button></div>';
+    }
+    h += '<div style="margin-top:6px"><button class="btn ghost small" data-action="addStudent" data-ci="' + ci + '">＋ ' + esc(t('addStudent')) + '</button></div>';
+    h += '</div>';
+  }
+  h += '<button class="btn ghost block" data-action="addClass">＋ ' + esc(t('addClass')) + '</button>';
+  h += '<div class="divider"></div>';
+  h += '<div class="setting-row" data-action="export"><span class="lbl">' + esc(t('exportBackup')) + '</span><span class="val">›</span></div>';
+  h += '<div class="setting-row" data-action="import"><span class="lbl">' + esc(t('importBackup')) + '</span><span class="val">›</span></div>';
+  h += '<div class="setting-row" data-action="clearAll"><span class="lbl" style="color:var(--red)">' + esc(t('clearAllData')) + '</span><span class="val">›</span></div>';
+  el.innerHTML = h;
+}
+
+/* ---------------- 事件 ---------------- */
+function handleAction(action, el) {
+  const ci = el.getAttribute('data-ci');
+  const si = el.getAttribute('data-si');
+  switch (action) {
+    case 'draw': doDraw(); break;
+    case 'undo': doUndo(); break;
+    case 'reset': doReset(); break;
+    case 'toggleAbsent': doToggleAbsent(+ci, +si); break;
+    case 'setPerDraw': doSetPerDraw(); break;
+    case 'addClass': doAddClass(); break;
+    case 'renameClass': doRenameClass(+ci); break;
+    case 'delClass': doDelClass(+ci); break;
+    case 'addStudent': doAddStudent(+ci); break;
+    case 'editStudent': doEditStudent(+ci, +si); break;
+    case 'delStudent': doDelStudent(+ci, +si); break;
+    case 'export': doExport(); break;
+    case 'import': doImport(); break;
+    case 'clearAll': doClearAll(); break;
+  }
+}
+
+document.addEventListener('click', e => {
+  const tabBtn = e.target.closest('.tab');
+  if (tabBtn) { currentTab = tabBtn.getAttribute('data-tab'); render(); return; }
+  const a = e.target.closest('[data-action]');
+  if (a) { handleAction(a.getAttribute('data-action'), a); }
+});
+
+document.getElementById('langSel').addEventListener('change', e => {
+  state.language = e.target.value;
+  save(); render();
+});
+
+/* ---------------- 启动 ---------------- */
+(function init() {
+  const sel = document.getElementById('langSel');
+  let opts = '';
+  for (const [code, name] of LANG_NAMES) opts += '<option value="' + code + '">' + name + '</option>';
+  sel.innerHTML = opts;
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
